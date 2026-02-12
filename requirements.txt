@@ -1,0 +1,6 @@
+ccxt
+PyQt5
+pyqtgraph
+numpy
+pandas
+win11toast

@@ -1,0 +1,39 @@
+{
+  "exchange": "kucoin",
+  "symbol": "BTC/USDT",
+  "symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "ADA/USDT"],
+  "default_symbol": "BTC/USDT",
+  "timeframes": ["1m", "5m", "15m"],
+  "default_timeframe": "1m",
+  "fetch_interval_sec": 2,
+  "order_book_depth": 0,
+  "indicators": {
+    "ema_short": 9,
+    "ema_long": 21,
+    "sma_period": 20,
+    "rsi_period": 14,
+    "rsi_oversold": 30,
+    "macd_fast": 12,
+    "macd_slow": 26,
+    "macd_signal": 9,
+    "bb_period": 20,
+    "bb_stddev": 2,
+    "atr_period": 14
+  },
+  "support_resistance": {
+    "pivot_left": 3,
+    "pivot_right": 3,
+    "swing_lookback": 50,
+    "cluster_tolerance_pct": 0.003
+  },
+  "entry_rules": {
+    "support_touch_buffer_pct": 0.002,
+    "min_expected_return_pct": 1.0
+  },
+  "alerts": {
+    "repeat_seconds": 30,
+    "sound": true,
+    "log_csv": "alerts.csv",
+    "log_txt": "alerts.txt"
+  }
+}
