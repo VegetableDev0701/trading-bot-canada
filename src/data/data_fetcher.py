@@ -13,16 +13,20 @@ class DataFetcher(QThread):
     tickers_updated = pyqtSignal(dict)
     symbols_updated = pyqtSignal(list)
     order_book_updated = pyqtSignal(dict)
+    daily_candles_updated = pyqtSignal(pd.DataFrame)
     status_updated = pyqtSignal(str)
 
     def __init__(self, symbol, timeframe, interval_sec,
-                 order_book_depth=0, symbols_for_table=None):
+                 order_book_depth=0, symbols_for_table=None, fetch_daily_for_pivots=False,
+                 candle_limit=500):
         super().__init__()
         self.symbol = symbol
         self.timeframe = timeframe
         self.interval_sec = interval_sec
         self.order_book_depth = order_book_depth
         self.symbols_for_table = symbols_for_table or []
+        self.fetch_daily_for_pivots = fetch_daily_for_pivots
+        self.candle_limit = max(100, int(candle_limit))
         self._running = True
         self._markets_loaded = False
         self.exchange = self._build_exchange()
@@ -57,6 +61,12 @@ class DataFetcher(QThread):
     def set_symbols_for_table(self, syms):
         self.symbols_for_table = syms or []
 
+    def set_candle_limit(self, n):
+        """Set candle limit; only increases to avoid losing history when zooming in."""
+        self.candle_limit = max(
+            self.candle_limit,
+            max(100, min(1000, int(n))))
+
     def run(self):
         while self._running:
             try:
@@ -68,7 +78,7 @@ class DataFetcher(QThread):
                     self._markets_loaded = True
 
                 raw = self.exchange.fetch_ohlcv(
-                    self.symbol, timeframe=self.timeframe, limit=200)
+                    self.symbol, timeframe=self.timeframe, limit=self.candle_limit)
                 df = pd.DataFrame(
                     raw, columns=["timestamp", "open", "high", "low", "close", "volume"])
                 df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
@@ -91,6 +101,14 @@ class DataFetcher(QThread):
                     ob = self.exchange.fetch_order_book(
                         self.symbol, limit=self.order_book_depth)
                     self.order_book_updated.emit(ob)
+
+                if self.fetch_daily_for_pivots:
+                    raw_1d = self.exchange.fetch_ohlcv(
+                        self.symbol, timeframe="1d", limit=3)
+                    df_1d = pd.DataFrame(
+                        raw_1d, columns=["timestamp", "open", "high", "low", "close", "volume"])
+                    df_1d["timestamp"] = pd.to_datetime(df_1d["timestamp"], unit="ms")
+                    self.daily_candles_updated.emit(df_1d)
 
             except Exception as e:
                 self.status_updated.emit(f"Fetch error: {e}")

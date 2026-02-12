@@ -125,3 +125,35 @@ def compute_support_resistance(df, cfg):
     resistances = _cluster(p_highs + sw_highs, cfg["cluster_tolerance_pct"])
     supports = _cluster(p_lows + sw_lows, cfg["cluster_tolerance_pct"])
     return supports, resistances
+
+
+def compute_classic_pivots(high, low, close):
+    """Classic pivot points from prior period H, L, C. Returns dict with PP, R1, R2, S1, S2."""
+    pp = (high + low + close) / 3.0
+    r1 = 2 * pp - low
+    r2 = pp + (high - low)
+    s1 = 2 * pp - high
+    s2 = pp - (high - low)
+    return {"PP": pp, "R1": r1, "R2": r2, "S1": s1, "S2": s2}
+
+
+def get_prior_hlc_for_pivots(df, cfg):
+    """
+    Get (high, low, close) for the prior period used for classic pivot points.
+    cfg: pivot_points config with "source" ("bar" | "daily") and "bar_lookback" (int).
+    For "bar": uses the last bar_lookback *closed* bars (excludes current open candle).
+    For "daily": returns None (caller must use daily df).
+    """
+    src = (cfg.get("pivot_points") or {}).get("source", "bar")
+    lookback = int((cfg.get("pivot_points") or {}).get("bar_lookback", 1))
+    if src == "bar":
+        # Need at least lookback + 1 rows: lookback closed bars + 1 current (open) candle to skip
+        if df.empty or len(df) < lookback + 1:
+            return None
+        # Exclude last row (current open candle); use only previous closed bar(s)
+        closed = df.iloc[-1 - lookback : -1]
+        high = float(closed["high"].max())
+        low = float(closed["low"].min())
+        close = float(closed["close"].iloc[-1])
+        return high, low, close
+    return None

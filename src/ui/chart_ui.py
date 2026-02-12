@@ -1,9 +1,10 @@
-from PyQt5.QtWidgets import (QFrame, QHBoxLayout, QMainWindow,
+from PyQt5.QtWidgets import (QFrame, QHBoxLayout, QLabel, QMainWindow,
                               QVBoxLayout, QWidget)
 
 from .chart_panel import ChartPanel
 from .components import PriceHistoryTable, SymbolList, TopBar
-from .theme import STYLESHEET
+from .order_book_widget import OrderBookWidget
+from .theme import STYLESHEET, BG_PANEL, BORDER, TEXT_DIM
 
 
 class ChartWindow(QMainWindow):
@@ -49,14 +50,32 @@ class ChartWindow(QMainWindow):
 
         self.chart_panel = ChartPanel()
         cl.addWidget(self.chart_panel, stretch=1)
+
+        footer = QFrame()
+        footer.setObjectName("footer")
+        footer.setStyleSheet(
+            f"QFrame#footer {{ background: {BG_PANEL}; border-top: 1px solid {BORDER}; }}")
+        fl = QHBoxLayout(footer)
+        fl.setContentsMargins(12, 6, 12, 6)
+        self.timeline_label = QLabel("—")
+        self.timeline_label.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px;")
+        fl.addWidget(self.timeline_label)
+        fl.addStretch()
+        cl.addWidget(footer)
+
         hlayout.addWidget(center, stretch=1)
 
         right = QFrame()
         right.setObjectName("rightPanel")
         rl = QVBoxLayout(right)
         rl.setContentsMargins(0, 0, 0, 0)
+        rl.setSpacing(8)
         self.price_table = PriceHistoryTable()
-        rl.addWidget(self.price_table)
+        self.price_table.setMinimumHeight(280)
+        rl.addWidget(self.price_table, 2)
+        self.order_book_widget = OrderBookWidget(max_levels=15)
+        self.order_book_widget.setMinimumHeight(200)
+        rl.addWidget(self.order_book_widget, 1)
         hlayout.addWidget(right)
 
     def update_ticker(self, ticker):
@@ -64,6 +83,7 @@ class ChartWindow(QMainWindow):
 
     def update_order_book(self, ob):
         self.top_bar.update_order_book(ob)
+        self.order_book_widget.update_depth(ob)
 
     def set_symbols(self, symbols, default_symbol):
         self.symbol_list.set_symbols(symbols, default_symbol)
@@ -71,8 +91,13 @@ class ChartWindow(QMainWindow):
     def update_price_table(self, tickers, symbol_filter, timestamp):
         self.price_table.update_price_table(tickers, symbol_filter, timestamp)
 
-    def update_chart(self, df, indicators, supports, resistances):
-        self.chart_panel.update_chart(df, indicators, supports, resistances)
+    def update_chart(self, df, indicators, supports, resistances, pivot_levels=None):
+        self.chart_panel.update_chart(df, indicators, supports, resistances, pivot_levels)
+        if not df.empty and "timestamp" in df.columns:
+            ts = df["timestamp"]
+            start = ts.min().strftime("%d %b %Y %H:%M")
+            end = ts.max().strftime("%d %b %Y %H:%M")
+            self.timeline_label.setText(f"{start}  —  {end}")
 
     def set_alert_manager(self, mgr):
         def _on_repeat(text):

@@ -8,7 +8,12 @@ from PyQt5.QtWidgets import QApplication
 
 from .data.data_fetcher import DataFetcher
 from .logic.logic import check_entry_signal
-from .logic.indicators import compute_indicators, compute_support_resistance
+from .logic.indicators import (
+    compute_indicators,
+    compute_support_resistance,
+    compute_classic_pivots,
+    get_prior_hlc_for_pivots,
+)
 from .ui.alerts import AlertManager, AlertPayload
 from .ui.chart_ui import ChartWindow
 
@@ -49,12 +54,17 @@ def main():
         alert_repeat_sec=alert_repeat, sound_mode=sound_mode)
     window.show()
 
+    pivot_cfg = cfg.get("pivot_points") or {}
+    fetch_daily_for_pivots = pivot_cfg.get("source") == "daily"
+
     fetcher = DataFetcher(
         symbol=default_sym,
         timeframe=cfg["default_timeframe"],
         interval_sec=cfg["fetch_interval_sec"],
         order_book_depth=cfg["order_book_depth"],
-        symbols_for_table=symbols)
+        symbols_for_table=symbols,
+        fetch_daily_for_pivots=fetch_daily_for_pivots,
+        candle_limit=cfg.get("candle_limit", 500))
 
     alert_mgr = AlertManager(
         log_csv=_resolve(alerts_cfg.get("log_csv", "alerts.csv")),
@@ -63,10 +73,26 @@ def main():
         sound_mode=sound_mode,
         sounds_dir=str(ROOT / "sounds"))
 
+    last_daily_df = [None]  # use list so closure can rebind
+
+    def on_daily_candles(df_1d):
+        last_daily_df[0] = df_1d
+
     def on_candles(df):
         ind = compute_indicators(df, cfg["indicators"])
         sups, ress = compute_support_resistance(df, cfg["support_resistance"])
-        window.update_chart(df, ind, sups, ress)
+        pivot_levels = None
+        if pivot_cfg.get("source") == "daily" and last_daily_df[0] is not None:
+            daily = last_daily_df[0]
+            if len(daily) >= 2:
+                prev = daily.iloc[-2]
+                pivot_levels = compute_classic_pivots(
+                    float(prev["high"]), float(prev["low"]), float(prev["close"]))
+        if pivot_levels is None:
+            hlc = get_prior_hlc_for_pivots(df, cfg)
+            if hlc is not None:
+                pivot_levels = compute_classic_pivots(*hlc)
+        window.update_chart(df, ind, sups, ress, pivot_levels)
 
         sig = check_entry_signal(df, ind, sups, ress, cfg)
         if sig.triggered and sig.buy_line and sig.expected_return_pct is not None:
@@ -99,6 +125,8 @@ def main():
             fetcher.set_symbol(default_sym)
 
     fetcher.candles_updated.connect(on_candles)
+    if fetch_daily_for_pivots:
+        fetcher.daily_candles_updated.connect(on_daily_candles)
     fetcher.ticker_updated.connect(on_ticker)
     fetcher.tickers_updated.connect(on_tickers)
     fetcher.order_book_updated.connect(on_order_book)
@@ -106,6 +134,7 @@ def main():
     fetcher.status_updated.connect(lambda msg: print(msg))
 
     window.timeframe_combo.currentTextChanged.connect(fetcher.set_timeframe)
+    window.chart_panel.desired_candle_limit_changed.connect(fetcher.set_candle_limit)
     window.set_alert_manager(alert_mgr)
 
     def _on_symbol_change():
