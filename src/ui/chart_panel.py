@@ -13,10 +13,12 @@ class RightAnchoredViewBox(pg.ViewBox):
     """ViewBox that zooms in/out anchored to the right edge (zoom expands/contracts to the left)."""
 
     def _right_center(self):
+        """Return center point on the right edge of the view (for zoom anchor)."""
         vr = self.targetRect()
         return Point(vr.right(), (vr.top() + vr.bottom()) * 0.5)
 
     def wheelEvent(self, ev, axis=None):
+        """Zoom in/out anchored to the right edge of the chart."""
         if axis in (0, 1):
             mask = [False, False]
             mask[axis] = self.state["mouseEnabled"][axis]
@@ -35,6 +37,7 @@ class RightAnchoredViewBox(pg.ViewBox):
         self.sigRangeChangedManually.emit(mask)
 
     def mouseDragEvent(self, ev, axis=None):
+        """Pan on left/middle drag; right-drag zoom anchored to right edge."""
         ev.accept()
         pos = ev.pos()
         lastPos = ev.lastPos()
@@ -65,6 +68,7 @@ class RightAnchoredViewBox(pg.ViewBox):
             self.scaleBy(x=x, y=y, center=center)
             self.sigRangeChangedManually.emit(self.state["mouseEnabled"])
 
+# Indicator line colors
 _CLR_EMA_SHORT = ACCENT
 _CLR_EMA_LONG  = "#00B0FF"
 _CLR_SMA       = "#B39DDB"
@@ -84,6 +88,7 @@ class ChartPanel(QWidget):
     desired_candle_limit_changed = pyqtSignal(int)
 
     def __init__(self):
+        """Build price/RSI/MACD/ATR plots, timeline axis, and legend checkboxes."""
         super().__init__()
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -227,6 +232,7 @@ class ChartPanel(QWidget):
         self._legend.adjustSize()
 
     def resizeEvent(self, ev):
+        """Reposition legend in top-right corner on resize."""
         super().resizeEvent(ev)
         w, h = self._legend.width(), self._legend.height()
         if w <= 0 or h <= 0:
@@ -235,6 +241,7 @@ class ChartPanel(QWidget):
         self._legend.setGeometry(self.width() - w - 8, 8, w, h)
 
     def _on_visibility_changed(self):
+        """Re-apply last chart data when legend checkbox toggles."""
         if self._last_df is not None and self._last_indicators is not None:
             self.update_chart(
                 self._last_df, self._last_indicators,
@@ -242,15 +249,18 @@ class ChartPanel(QWidget):
                 self._last_pivot_levels)
 
     def _on_view_range_changed(self):
+        """Debounce: start timer to emit desired candle limit after zoom/pan."""
         self._limit_timer.start(200)
 
     def _emit_desired_candle_limit(self):
+        """Emit desired candle count from visible bar count (for fetcher)."""
         x_min, x_max = self._vb_price.viewRange()[0]
         visible_bars = max(1, int(x_max - x_min))
         desired = max(100, min(1000, int(visible_bars * 1.2)))
         self.desired_candle_limit_changed.emit(desired)
 
     def update_chart(self, df, indicators, supports, resistances, pivot_levels=None):
+        """Update candles, indicator lines, S/R, pivots; preserve zoom to right edge."""
         if df.empty:
             return
         # Capture current X view width before updating (preserve zoom; right edge will be fixed to last candle)
@@ -275,6 +285,7 @@ class ChartPanel(QWidget):
         x = np.arange(len(df))
 
         def _overlay(plot, series, color, w=1):
+            """Add one indicator line to plot and return the item."""
             line = pg.PlotDataItem(x, series.values, pen=pg.mkPen(color, width=w))
             plot.addItem(line)
             return line

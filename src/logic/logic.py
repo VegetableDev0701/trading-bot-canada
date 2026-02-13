@@ -1,21 +1,25 @@
+"""Entry signal logic: checks config rules against supports/resistances and indicators."""
 from .indicators import IndicatorSet
 
 
 class EntrySignal:
 
     def __init__(self, triggered=False, buy_line=None, expected_return=None, reasons=None):
+        """Store entry signal result: triggered flag, buy level, expected return %, and reason strings."""
         self.triggered = triggered
         self.buy_line = buy_line
         self.expected_return_pct = expected_return
         self.reasons = reasons or []
 
 
-def _closest_resistance_above(price, resistances):
+def _nearest_resistance_above(price, resistances):
+    """Return the smallest resistance level strictly above price, or None."""
     above = [r for r in resistances if r > price]
     return min(above) if above else None
 
 
-def check_entry_signal(df, indicators, supports, resistances, config):
+def evaluate_entry_signal(df, indicators, supports, resistances, config):
+    """Check entry rules (RSI, support touch, EMA, MACD, min return); return EntrySignal."""
     reasons = []
 
     if len(df) < 3:
@@ -58,7 +62,7 @@ def check_entry_signal(df, indicators, supports, resistances, config):
 
     buy_line = close
 
-    nearest_res = _closest_resistance_above(buy_line, resistances)
+    nearest_res = _nearest_resistance_above(buy_line, resistances)
     exp_ret = None
     if nearest_res:
         exp_ret = ((nearest_res - buy_line) / buy_line) * 100

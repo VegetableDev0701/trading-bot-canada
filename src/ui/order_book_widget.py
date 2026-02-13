@@ -1,3 +1,4 @@
+"""Order book depth table: bids and asks from exchange."""
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QFrame, QHeaderView, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
@@ -8,6 +9,7 @@ class OrderBookWidget(QFrame):
     """Order book depth: top N levels of bids and asks in a table."""
 
     def __init__(self, max_levels=15, parent=None):
+        """Build order book table with title and max_levels rows for bids/asks."""
         super().__init__(parent)
         self.setObjectName("orderBookWidget")
         self.setStyleSheet(
@@ -44,23 +46,25 @@ class OrderBookWidget(QFrame):
                 item.setForeground(self._table.palette().brush(self._table.foregroundRole()))
             if i < len(bids):
                 price, size = bids[i]
-                self._table.item(i, 0).setText(_fmt_size(size))
-                self._table.item(i, 1).setText(_fmt_price(price))
+                self._table.item(i, 0).setText(_format_size(size))
+                self._table.item(i, 1).setText(_format_price(price))
                 self._table.item(i, 0).setForeground(QColor(GREEN))
                 self._table.item(i, 1).setForeground(QColor(GREEN))
             if i < len(asks):
                 price, size = asks[i]
-                self._table.item(i, 2).setText(_fmt_price(price))
-                self._table.item(i, 3).setText(_fmt_size(size))
+                self._table.item(i, 2).setText(_format_price(price))
+                self._table.item(i, 3).setText(_format_size(size))
                 self._table.item(i, 2).setForeground(QColor(RED))
                 self._table.item(i, 3).setForeground(QColor(RED))
         self._table.viewport().update()
 
     def clear(self):
+        """Remove all rows from the order book table."""
         self._table.setRowCount(0)
 
 
-def _fmt_size(x):
+def _format_size(x):
+    """Format size for display (fewer decimals for small values)."""
     try:
         f = float(x)
         if f >= 1:
@@ -70,7 +74,8 @@ def _fmt_size(x):
         return str(x)
 
 
-def _fmt_price(x):
+def _format_price(x):
+    """Format price with commas and two decimals."""
     try:
         return f"{float(x):,.2f}"
     except (TypeError, ValueError):

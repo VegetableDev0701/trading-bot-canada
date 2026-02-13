@@ -1,3 +1,4 @@
+"""Fetches candles, ticker, order book and symbols from KuCoin via ccxt."""
 import os
 import time
 
@@ -7,6 +8,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 
 class DataFetcher(QThread):
+    """Background thread: polls exchange for candles, ticker, order book; emits signals."""
 
     candles_updated = pyqtSignal(pd.DataFrame)
     ticker_updated = pyqtSignal(dict)
@@ -19,6 +21,7 @@ class DataFetcher(QThread):
     def __init__(self, symbol, timeframe, interval_sec,
                  order_book_depth=0, symbols_for_table=None, fetch_daily_for_pivots=False,
                  candle_limit=500):
+        """Initialize fetcher with symbol, timeframe, poll interval, and optional limits."""
         super().__init__()
         self.symbol = symbol
         self.timeframe = timeframe
@@ -32,6 +35,7 @@ class DataFetcher(QThread):
         self.exchange = self._build_exchange()
 
     def _build_exchange(self):
+        """Create and return ccxt KuCoin exchange instance (optionally with API keys)."""
         opts = {"enableRateLimit": True}
         key = os.getenv("KUCOIN_API_KEY")
         secret = os.getenv("KUCOIN_API_SECRET")
@@ -47,18 +51,23 @@ class DataFetcher(QThread):
         return ex
 
     def stop(self):
+        """Signal the run loop to exit."""
         self._running = False
 
     def set_timeframe(self, tf):
+        """Set candle timeframe (e.g. 1m, 5m)."""
         self.timeframe = tf
 
     def set_symbol(self, sym):
+        """Set trading pair symbol."""
         self.symbol = sym
 
     def set_interval(self, sec):
+        """Set poll interval in seconds (min 0.5)."""
         self.interval_sec = max(0.5, float(sec))
 
     def set_symbols_for_table(self, syms):
+        """Set list of symbols to include in the price table snapshot."""
         self.symbols_for_table = syms or []
 
     def set_candle_limit(self, n):
@@ -68,6 +77,7 @@ class DataFetcher(QThread):
             max(100, min(1000, int(n))))
 
     def run(self):
+        """Main loop: fetch candles, ticker, order book; emit signals; sleep until next interval."""
         while self._running:
             loop_start = time.monotonic()
             try:

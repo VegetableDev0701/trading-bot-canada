@@ -1,3 +1,4 @@
+# Dark theme color palette
 BG_MAIN     = "#0B0E11"
 BG_PANEL    = "#161A1E"
 BG_CARD     = "#1E2329"

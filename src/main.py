@@ -1,3 +1,4 @@
+"""KuCoin Trading Assistant entry point: loads config, starts UI and data fetcher."""
 import json
 import os
 import sys
@@ -7,32 +8,36 @@ from pathlib import Path
 from PyQt5.QtWidgets import QApplication
 
 from .data.data_fetcher import DataFetcher
-from .logic.logic import check_entry_signal
+from .logic.logic import evaluate_entry_signal
 from .logic.indicators import (
-    compute_indicators,
-    compute_support_resistance,
-    compute_classic_pivots,
-    get_prior_hlc_for_pivots,
+    build_indicator_set,
+    build_support_resistance,
+    classic_pivot_levels,
+    prior_hlc_for_pivots,
 )
 from .ui.alerts import AlertManager, AlertPayload
 from .ui.chart_ui import ChartWindow
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# Display interval label -> fetch interval in seconds
 INTERVAL_MAP = {1: 0.3, 2: 1, 3: 2, 4: 3, 5: 4}
 
 
-def _load_config():
+def _read_config():
+    """Load and return config from config.json."""
     with (ROOT / "config.json").open() as f:
         return json.load(f)
 
 
-def _resolve(p):
+def _resolve_path(p):
+    """Return path as-is if absolute, else path under project root."""
     return p if os.path.isabs(p) else str(ROOT / p)
 
 
 def main():
-    cfg = _load_config()
+    """Load config, create UI and fetcher, wire signals, run event loop."""
+    cfg = _read_config()
     app = QApplication(sys.argv)
 
     symbols = cfg.get("symbols") or [cfg["symbol"]]
@@ -67,8 +72,8 @@ def main():
         candle_limit=cfg.get("candle_limit", 500))
 
     alert_mgr = AlertManager(
-        log_csv=_resolve(alerts_cfg.get("log_csv", "alerts.csv")),
-        log_txt=_resolve(alerts_cfg.get("log_txt", "alerts.txt")),
+        log_csv=_resolve_path(alerts_cfg.get("log_csv", "alerts.csv")),
+        log_txt=_resolve_path(alerts_cfg.get("log_txt", "alerts.txt")),
         repeat_seconds=alert_repeat,
         sound_mode=sound_mode,
         sounds_dir=str(ROOT / "sounds"))
@@ -76,25 +81,27 @@ def main():
     last_daily_df = [None]  # use list so closure can rebind
 
     def on_daily_candles(df_1d):
+        """Store daily candles for pivot calculation."""
         last_daily_df[0] = df_1d
 
     def on_candles(df):
-        ind = compute_indicators(df, cfg["indicators"])
-        sups, ress = compute_support_resistance(df, cfg["support_resistance"])
+        """Compute indicators, S/R, pivots; update chart and fire alert if entry signal."""
+        ind = build_indicator_set(df, cfg["indicators"])
+        sups, ress = build_support_resistance(df, cfg["support_resistance"])
         pivot_levels = None
         if pivot_cfg.get("source") == "daily" and last_daily_df[0] is not None:
             daily = last_daily_df[0]
             if len(daily) >= 2:
                 prev = daily.iloc[-2]
-                pivot_levels = compute_classic_pivots(
+                pivot_levels = classic_pivot_levels(
                     float(prev["high"]), float(prev["low"]), float(prev["close"]))
         if pivot_levels is None:
-            hlc = get_prior_hlc_for_pivots(df, cfg)
+            hlc = prior_hlc_for_pivots(df, cfg)
             if hlc is not None:
-                pivot_levels = compute_classic_pivots(*hlc)
+                pivot_levels = classic_pivot_levels(*hlc)
         window.update_chart(df, ind, sups, ress, pivot_levels)
 
-        sig = check_entry_signal(df, ind, sups, ress, cfg)
+        sig = evaluate_entry_signal(df, ind, sups, ress, cfg)
         if sig.triggered and sig.buy_line and sig.expected_return_pct is not None:
             alert_mgr.fire(AlertPayload(
                 symbol=default_sym,
@@ -104,17 +111,21 @@ def main():
                 reasons=sig.reasons))
 
     def on_ticker(ticker):
+        """Forward latest ticker to the top bar."""
         window.update_ticker(ticker)
 
     def on_tickers(tickers):
+        """Update price history table for current symbol."""
         cur = window.symbol_list.currentItem()
         sym = cur.text() if cur else default_sym
         window.update_price_table(tickers, sym, time.strftime("%H:%M:%S"))
 
     def on_order_book(ob):
+        """Forward order book snapshot to the order book widget."""
         window.update_order_book(ob)
 
     def on_symbols(sym_list):
+        """Refresh symbol list and default symbol from exchange."""
         nonlocal symbols, default_sym
         symbols = sym_list
         if default_sym not in symbols and symbols:
@@ -138,6 +149,7 @@ def main():
     window.set_alert_manager(alert_mgr)
 
     def _on_symbol_change():
+        """Switch fetcher to the selected symbol and update table."""
         item = window.symbol_list.currentItem()
         if item:
             s = item.text()
@@ -147,6 +159,7 @@ def main():
     window.symbol_list.currentRowChanged.connect(lambda _: _on_symbol_change())
 
     def _on_interval(text):
+        """Set fetcher poll interval from combo box selection."""
         if text.isdigit():
             fetcher.set_interval(INTERVAL_MAP.get(int(text), 1))
 

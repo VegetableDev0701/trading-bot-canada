@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import QLineEdit, QListWidget, QVBoxLayout, QWidget
 class SymbolList(QWidget):
 
     def __init__(self, symbols, default_symbol):
+        """Build search box and list of symbols with default selection."""
         super().__init__()
         self.setFixedWidth(200)
 
@@ -28,6 +29,7 @@ class SymbolList(QWidget):
         self._list.currentRowChanged.connect(self._on_row)
 
     def _apply_filter(self):
+        """Filter list by search text and try to keep current selection."""
         q = self._search.text().strip().upper()
         self._list.clear()
         if q:
@@ -37,6 +39,7 @@ class SymbolList(QWidget):
         self._try_select(self._selected)
 
     def _try_select(self, sym):
+        """Select list row matching symbol, or first row if not found."""
         for i in range(self._list.count()):
             if self._list.item(i).text() == sym:
                 self._list.setCurrentRow(i)
@@ -45,10 +48,12 @@ class SymbolList(QWidget):
             self._list.setCurrentRow(0)
 
     def _on_row(self, row):
+        """Store selected symbol when user picks a row."""
         if 0 <= row < self._list.count():
             self._selected = self._list.item(row).text()
 
     def set_symbols(self, symbols, default_symbol):
+        """Replace symbol list and set default selection."""
         self._all = sorted(symbols)
         self._selected = default_symbol
         self._search.clear()
@@ -57,4 +62,5 @@ class SymbolList(QWidget):
         self._try_select(default_symbol)
 
     def currentItem(self):
+        """Return the currently selected list item."""
         return self._list.currentItem()

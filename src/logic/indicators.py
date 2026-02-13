@@ -6,6 +6,7 @@ class IndicatorSet:
 
     def __init__(self, ema_short, ema_long, sma, rsi, macd, macd_signal,
                  macd_hist, bb_upper, bb_mid, bb_lower, atr):
+        """Hold computed indicator series for one OHLCV frame."""
         self.ema_short = ema_short
         self.ema_long = ema_long
         self.sma = sma
@@ -19,15 +20,18 @@ class IndicatorSet:
         self.atr = atr
 
 
-def calc_ema(series, period):
+def ema_series(series, period):
+    """Exponential moving average of series over period."""
     return series.ewm(span=period, adjust=False).mean()
 
 
-def calc_sma(series, period):
+def sma_series(series, period):
+    """Simple moving average of series over period."""
     return series.rolling(period).mean()
 
 
-def calc_rsi(series, period):
+def rsi_series(series, period):
+    """Relative strength index (0–100) over period."""
     delta = series.diff()
     gains = delta.clip(lower=0)
     losses = -delta.clip(upper=0)
@@ -37,22 +41,25 @@ def calc_rsi(series, period):
     return 100 - (100 / (1 + rs))
 
 
-def calc_macd(series, fast, slow, signal):
-    fast_line = calc_ema(series, fast)
-    slow_line = calc_ema(series, slow)
+def macd_series(series, fast, slow, signal):
+    """MACD line, signal line, and histogram (macd - signal)."""
+    fast_line = ema_series(series, fast)
+    slow_line = ema_series(series, slow)
     macd_line = fast_line - slow_line
-    sig = calc_ema(macd_line, signal)
+    sig = ema_series(macd_line, signal)
     hist = macd_line - sig
     return macd_line, sig, hist
 
 
-def calc_bollinger(series, period, num_std):
-    mid = calc_sma(series, period)
+def bollinger_bands(series, period, num_std):
+    """Upper, middle, and lower Bollinger bands."""
+    mid = sma_series(series, period)
     std = series.rolling(period).std()
     return mid + num_std * std, mid, mid - num_std * std
 
 
-def calc_atr(df, period):
+def atr_series(df, period):
+    """Average true range over period from OHLC dataframe."""
     prev_close = df["close"].shift(1)
     tr = pd.concat([
         df["high"] - df["low"],
@@ -62,17 +69,18 @@ def calc_atr(df, period):
     return tr.rolling(period).mean()
 
 
-def compute_indicators(df, cfg):
+def build_indicator_set(df, cfg):
+    """Compute all indicators from config and return an IndicatorSet."""
     c = df["close"]
 
-    ema_s = calc_ema(c, cfg["ema_short"])
-    ema_l = calc_ema(c, cfg["ema_long"])
-    sma_val = calc_sma(c, cfg["sma_period"])
-    rsi_val = calc_rsi(c, cfg["rsi_period"])
-    macd_val, macd_sig, macd_h = calc_macd(
+    ema_s = ema_series(c, cfg["ema_short"])
+    ema_l = ema_series(c, cfg["ema_long"])
+    sma_val = sma_series(c, cfg["sma_period"])
+    rsi_val = rsi_series(c, cfg["rsi_period"])
+    macd_val, macd_sig, macd_h = macd_series(
         c, cfg["macd_fast"], cfg["macd_slow"], cfg["macd_signal"])
-    bb_up, bb_m, bb_lo = calc_bollinger(c, cfg["bb_period"], cfg["bb_stddev"])
-    atr_val = calc_atr(df, cfg["atr_period"])
+    bb_up, bb_m, bb_lo = bollinger_bands(c, cfg["bb_period"], cfg["bb_stddev"])
+    atr_val = atr_series(df, cfg["atr_period"])
 
     return IndicatorSet(
         ema_short=ema_s, ema_long=ema_l, sma=sma_val,
@@ -82,7 +90,8 @@ def compute_indicators(df, cfg):
     )
 
 
-def _find_pivots(df, left, right):
+def _pivot_highs_lows(df, left, right):
+    """Find pivot highs and lows using left/right window bars."""
     highs = df["high"].values
     lows = df["low"].values
     p_highs, p_lows = [], []
@@ -98,12 +107,14 @@ def _find_pivots(df, left, right):
     return p_highs, p_lows
 
 
-def _get_recent_swings(df, lookback):
+def _swing_highs_lows(df, lookback):
+    """Return last lookback highs and lows as two lists."""
     tail = df.tail(lookback)
     return tail["high"].tolist(), tail["low"].tolist()
 
 
-def _cluster(levels, tol_pct):
+def _cluster_levels(levels, tol_pct):
+    """Group levels within tol_pct and return cluster means."""
     if not levels:
         return []
 
@@ -118,16 +129,17 @@ def _cluster(levels, tol_pct):
     return [float(np.mean(g)) for g in groups]
 
 
-def compute_support_resistance(df, cfg):
-    p_highs, p_lows = _find_pivots(df, cfg["pivot_left"], cfg["pivot_right"])
-    sw_highs, sw_lows = _get_recent_swings(df, cfg["swing_lookback"])
+def build_support_resistance(df, cfg):
+    """Compute support and resistance level lists from pivots and swings."""
+    p_highs, p_lows = _pivot_highs_lows(df, cfg["pivot_left"], cfg["pivot_right"])
+    sw_highs, sw_lows = _swing_highs_lows(df, cfg["swing_lookback"])
 
-    resistances = _cluster(p_highs + sw_highs, cfg["cluster_tolerance_pct"])
-    supports = _cluster(p_lows + sw_lows, cfg["cluster_tolerance_pct"])
+    resistances = _cluster_levels(p_highs + sw_highs, cfg["cluster_tolerance_pct"])
+    supports = _cluster_levels(p_lows + sw_lows, cfg["cluster_tolerance_pct"])
     return supports, resistances
 
 
-def compute_classic_pivots(high, low, close):
+def classic_pivot_levels(high, low, close):
     """Classic pivot points from prior period H, L, C. Returns dict with PP, R1, R2, S1, S2."""
     pp = (high + low + close) / 3.0
     r1 = 2 * pp - low
@@ -137,7 +149,7 @@ def compute_classic_pivots(high, low, close):
     return {"PP": pp, "R1": r1, "R2": r2, "S1": s1, "S2": s2}
 
 
-def get_prior_hlc_for_pivots(df, cfg):
+def prior_hlc_for_pivots(df, cfg):
     """
     Get (high, low, close) for the prior period used for classic pivot points.
     cfg: pivot_points config with "source" ("bar" | "daily") and "bar_lookback" (int).

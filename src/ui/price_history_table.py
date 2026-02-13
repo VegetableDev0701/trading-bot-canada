@@ -11,6 +11,7 @@ MAX_ROWS = 200
 class PriceHistoryTable(QTableWidget):
 
     def __init__(self):
+        """Table with Time, Last, Bid, Ask, Chg % columns."""
         super().__init__(0, 5)
         self.setHorizontalHeaderLabels(["Time", "Last", "Bid", "Ask", "Chg %"])
         self.setMinimumWidth(300)
@@ -31,6 +32,7 @@ class PriceHistoryTable(QTableWidget):
         hdr.setSectionResizeMode(4, QHeaderView.ResizeToContents)
 
     def update_price_table(self, tickers, symbol, timestamp):
+        """Prepend one row with ticker data for symbol; trim to MAX_ROWS."""
         if symbol not in tickers:
             return
         t = tickers[symbol] or {}

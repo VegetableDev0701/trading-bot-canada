@@ -1,3 +1,4 @@
+"""Alert delivery: log to CSV/TXT, optional sound and Windows toast."""
 import csv
 import os
 import sys
@@ -27,6 +28,7 @@ SOUND_MODES = ("off", "beep", "alert1", "alert2", "alert3")
 class AlertPayload:
 
     def __init__(self, symbol, price, buy_line, expected_return_pct, reasons):
+        """Payload for one alert: symbol, price, buy level, expected return %, reason list."""
         self.symbol = symbol
         self.price = price
         self.buy_line = buy_line
@@ -37,6 +39,7 @@ class AlertPayload:
 class AlertManager:
 
     def __init__(self, log_csv, log_txt=None, repeat_seconds=30, sound_mode="beep", sounds_dir=None):
+        """Configure log paths, repeat cooldown, sound mode, and optional sounds directory."""
         self.log_csv = log_csv
         self.log_txt = log_txt
         self.repeat_seconds = repeat_seconds
@@ -45,13 +48,16 @@ class AlertManager:
         self._last_ts = None
 
     def set_repeat_seconds(self, seconds):
+        """Set minimum seconds between alerts (cooldown)."""
         self.repeat_seconds = max(1, int(seconds))
 
     def set_sound_mode(self, mode):
+        """Set sound mode to one of SOUND_MODES (off, beep, alert1, etc.)."""
         if mode in SOUND_MODES:
             self.sound_mode = mode
 
     def _play_sound(self):
+        """Play beep or selected alert sound file."""
         if self.sound_mode == "off":
             return
         if self.sound_mode == "beep":
@@ -70,11 +76,13 @@ class AlertManager:
             return
 
     def _cooldown_ok(self):
+        """Return True if enough time has passed since last alert."""
         if self._last_ts is None:
             return True
         return (time.time() - self._last_ts) >= self.repeat_seconds
 
     def fire(self, payload):
+        """Show popup, optional toast/sound, and append to CSV/TXT logs (if cooldown ok)."""
         if not self._cooldown_ok():
             return
         self._last_ts = time.time()
@@ -101,6 +109,7 @@ class AlertManager:
         self._write_log(payload)
 
     def _write_log(self, p):
+        """Append one alert to CSV and TXT log files."""
         ts = time.strftime("%Y-%m-%d %H:%M:%S")
         reasons_str = "; ".join(p.reasons)
 

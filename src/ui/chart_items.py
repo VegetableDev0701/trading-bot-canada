@@ -7,11 +7,13 @@ from .theme import GREEN, RED
 class CandlestickItem(pg.GraphicsObject):
 
     def __init__(self):
+        """Graphics object for drawing OHLC candlesticks."""
         super().__init__()
         self._bars = []
         self.timestamps = []
 
     def set_data(self, df):
+        """Set candle data from OHLCV dataframe; triggers repaint."""
         self._bars = [
             (i, row["open"], row["close"], row["low"], row["high"])
             for i, row in df.iterrows()
@@ -21,6 +23,7 @@ class CandlestickItem(pg.GraphicsObject):
         self.update()
 
     def paint(self, p, *_args):
+        """Draw wicks and bodies for each candle (green/red by close vs open)."""
         for x, o, c, lo, hi in self._bars:
             col = pg.mkColor(GREEN if c >= o else RED)
             p.setPen(pg.mkPen(col))
@@ -30,6 +33,7 @@ class CandlestickItem(pg.GraphicsObject):
             p.drawRect(body)
 
     def boundingRect(self):
+        """Return bounding rect of all candles for proper clipping."""
         if not self._bars:
             return QtCore.QRectF()
         xs   = [b[0] for b in self._bars]
@@ -43,15 +47,18 @@ class CandlestickItem(pg.GraphicsObject):
 class TimeAxisItem(pg.AxisItem):
 
     def __init__(self, *args, **kw):
+        """Axis item that displays time labels from timestamp list."""
         super().__init__(*args, **kw)
         self._ts = []
 
     def set_timestamps(self, ts_list):
+        """Set timestamp list for tick label formatting."""
         self._ts = ts_list
         self.picture = None
         self.update()
 
     def tickStrings(self, values, scale, spacing):
+        """Format axis ticks as time strings (e.g. HH:MM)."""
         if not self._ts:
             return [""] * len(values)
         out = []

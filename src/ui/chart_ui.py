@@ -8,9 +8,11 @@ from .theme import STYLESHEET, BG_PANEL, BORDER, TEXT_DIM
 
 
 class ChartWindow(QMainWindow):
+    """Main application window: chart, symbol list, top bar, price table, order book."""
 
     def __init__(self, timeframes, default_tf, intervals, default_interval,
                  symbols, default_symbol, alert_repeat_sec=30, sound_mode="beep"):
+        """Build main layout: symbol list, top bar, chart panel, footer, price table, order book."""
         super().__init__()
         self.setWindowTitle("KuCoin Trading Assistant")
         self.resize(1680, 900)
@@ -79,19 +81,24 @@ class ChartWindow(QMainWindow):
         hlayout.addWidget(right)
 
     def update_ticker(self, ticker):
+        """Forward ticker update to top bar."""
         self.top_bar.update_ticker(ticker)
 
     def update_order_book(self, ob):
+        """Update top bar depth label and order book widget table."""
         self.top_bar.update_order_book(ob)
         self.order_book_widget.update_depth(ob)
 
     def set_symbols(self, symbols, default_symbol):
+        """Replace symbol list and set default selection."""
         self.symbol_list.set_symbols(symbols, default_symbol)
 
     def update_price_table(self, tickers, symbol_filter, timestamp):
+        """Refresh price history table for given symbol and timestamp."""
         self.price_table.update_price_table(tickers, symbol_filter, timestamp)
 
     def update_chart(self, df, indicators, supports, resistances, pivot_levels=None):
+        """Pass new candle data and levels to chart panel and update timeline label."""
         self.chart_panel.update_chart(df, indicators, supports, resistances, pivot_levels)
         if not df.empty and "timestamp" in df.columns:
             ts = df["timestamp"]
@@ -100,11 +107,14 @@ class ChartWindow(QMainWindow):
             self.timeline_label.setText(f"{start}  —  {end}")
 
     def set_alert_manager(self, mgr):
+        """Connect alert repeat and sound combos to manager and apply current values."""
         def _on_repeat(text):
+            """Apply alert repeat seconds from combo to manager."""
             if text and text.isdigit():
                 mgr.set_repeat_seconds(int(text))
 
         def _on_sound(text):
+            """Apply sound mode from combo to manager."""
             m = {"Off": "off", "Beep": "beep", "Alert 1": "alert1",
                  "Alert 2": "alert2", "Alert 3": "alert3"}
             if text in m:

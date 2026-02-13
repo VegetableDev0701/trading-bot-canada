@@ -5,9 +5,11 @@ from .theme import ACCENT, GREEN, RED, TEXT_DIM
 
 
 class TopBar(QWidget):
+    """Toolbar: timeframe, refresh interval, alert repeat, sound mode."""
 
     def __init__(self, timeframes, default_tf, intervals, default_interval,
                  alert_repeat_sec=30, sound_mode="beep"):
+        """Build toolbar with combos and ticker/depth labels."""
         super().__init__()
         row = QHBoxLayout(self)
         row.setAlignment(Qt.AlignLeft)
@@ -52,11 +54,13 @@ class TopBar(QWidget):
             row.addWidget(w)
 
     def _make_label(self, text, color, weight, size):
+        """Create a styled QLabel with given text, color, font weight and size."""
         lbl = QLabel(text)
         lbl.setStyleSheet(f"color:{color}; font-weight:{weight}; font-size:{size}px;")
         return lbl
 
     def update_ticker(self, ticker):
+        """Update symbol, last price, change %, and volume labels from ticker dict."""
         sym = ticker.get("symbol")
         last = ticker.get("last")
         pct = ticker.get("percentage")
@@ -88,6 +92,7 @@ class TopBar(QWidget):
             self._vol.setText(f"Vol: {bvol:,.2f}")
 
     def update_order_book(self, ob):
+        """Update depth label from order book bids/asks."""
         bids = ob.get("bids") or []
         asks = ob.get("asks") or []
         d = min(len(bids), len(asks))
