@@ -75,6 +75,9 @@ _CLR_MACD_SIG  = "#F6465D"
 _CLR_MACD_HIST = "#5E6673"
 _CLR_ATR       = "#B39DDB"
 
+# Fixed pixel gap between last candle and right edge of chart (same at any zoom)
+RIGHT_MARGIN_PX = 300
+
 
 class ChartPanel(QWidget):
 
@@ -342,9 +345,13 @@ class ChartPanel(QWidget):
         pad = (y_max - y_min) * 0.02 or 1e-6
         self.pw.setYRange(y_min - pad, y_max + pad, padding=0)
 
-        # Fix X range: last candle on the right; zoom out shows more candles to the left
+        # Fix X range: last candle inset from right by RIGHT_MARGIN_PX pixels
         n = len(df)
         x_right = n - 1
+        x_left = max(0, x_right - visible_width)
+        self._vb_price.setXRange(x_left, x_right, padding=0)
+        units_per_pixel = self._vb_price.viewPixelSize()[0]
+        x_right = n - 1 + RIGHT_MARGIN_PX * units_per_pixel
         x_left = max(0, x_right - visible_width)
         self._vb_price.setXRange(x_left, x_right, padding=0)
 

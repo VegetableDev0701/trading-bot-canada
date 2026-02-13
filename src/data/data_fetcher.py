@@ -69,6 +69,7 @@ class DataFetcher(QThread):
 
     def run(self):
         while self._running:
+            loop_start = time.monotonic()
             try:
                 if not self._markets_loaded:
                     mkts = self.exchange.load_markets()
@@ -113,4 +114,8 @@ class DataFetcher(QThread):
             except Exception as e:
                 self.status_updated.emit(f"Fetch error: {e}")
 
-            time.sleep(self.interval_sec)
+            # Sleep only the remaining time so total period is consistent
+            elapsed = time.monotonic() - loop_start
+            sleep_time = self.interval_sec - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
